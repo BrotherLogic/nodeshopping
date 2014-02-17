@@ -56,7 +56,9 @@ function updateItem(diff,listid) {
 	diffs.save(diff);
 
 	//Adjust the list accordingly
-	list_item = listItems.findOne({description: diff.description, listid:listid});
+	listItems.findOne({description: String(diff.description), listid:String(listid)}, function (success,doc){
+		
+	});
 
 	console.log("Found " + list_item + " from " + diff.description + " and " + listid);
 	console.log("Also " + (diff.description instanceof String));
@@ -85,8 +87,6 @@ function updateItem(diff,listid) {
 
 		return diff;
 	}
-
-
 }
 
 function getList(req,res,next) {
@@ -132,19 +132,13 @@ function addList(userids)
 {
 	//Create a default list for this user
 	var list = {};
-	list.users = [req.params.id];
+	list.users = userids;
 	list.items = [];
 
     lists.save(list, function(err,success){
-		console.log('Response success ' + success);
-		console.log('Response error ' + err);
-		if (success) {
-				res.send(201,user);
-				return next();
-			} else {
-				return next(err);
-			}
-		});
+		console.log('addList Response success ' + success);
+		console.log('addList Response error ' + err);
+	});
 }
 
 function addUser(req,res,next){
@@ -171,6 +165,8 @@ function addUser(req,res,next){
 	    		console.log('Response error ' + err);
 	    		if (success) {
 	    			addList([req.params.id]);
+	    			res.send(201,user);
+	    			return next();
 	    		} else {
 					return next(err);
 	    		}
