@@ -17,11 +17,10 @@ var connection_string = '127.0.0.1:27017/myapp';
 var db = mongojs(connection_string,['myapp']);
 var users = db.collection("user");
 var lists = db.collection("list");
-var listItems = db.collection("items");
-var diffs = db.collection("diffs");
+var listItems = db.collection("item");
+var diffs = db.collection("diff");
 
 server.put({path: '/user', version: '0.0.1'}, addUser);
-server.put({path: '/list', version: '0.0.1'}, addList);
 server.get({path: '/list/:id/:timestamp', version: '0.0.1'}, getList);
 server.get({path: '/list',version : '0.0.1'},getListForUser);
 server.put({path: '/list/:listid/addItem', version: '0.0.1'}, addItemToList)
@@ -35,18 +34,10 @@ function addItemToList(req,res,next) {
 	diff.number = req.params.number;
 
 	listid = req.params.listid;
-
-	console.log("Updating " + diff + " and " + listid);
-
-	givenDiff = updateItem(diff,listid);
-
-	console.log("updated item");
-
-	res.send(200,givenDiff);
-	return next();
+	givenDiff = updateItem(diff,listid,res);
 }
 
-function updateItem(diff,listid) {
+function updateItem(diff,listid,res) {
 
 	//add the diff to the diff table
 	diff = diff;
@@ -57,36 +48,38 @@ function updateItem(diff,listid) {
 
 	//Adjust the list accordingly
 	listItems.findOne({description: String(diff.description), listid:String(listid)}, function (success,doc){
-		
-	});
+		list_item = doc;
+		if (list_item == null) {
 
-	console.log("Found " + list_item + " from " + diff.description + " and " + listid);
-	console.log("Also " + (diff.description instanceof String));
-	console.log("Also " + (listid instanceof String));
+			//Add the item to the list
+			newItem = {};
+			newItem.number = diff.number;
+			newItem.description = diff.description;
+			newItem.listid = listid;
 
-	if (list_item == null) {
-
-		//Add the item to the list
-		newItem = {};
-		newItem.number = diff.number;
-		newItem.description = diff.description;
-		newItem.listid = listid;
-
-		listItems.save(newItem);
-		return diff;
-	} else {
-		//Update the item
-		list_item.number += diff.number;
-
-		if (list_item.number <= 0) {
-			//Delete the item
-			lists.delete(list_item);
+			listItems.save(newItem);
+			res.send(201,diff);
 		} else {
-			lists.update(list_item);
-		}
+			//Update the item
+			list_item.number += diff.number;
 
-		return diff;
-	}
+			if (list_item.number <= 0) {
+				//Delete the item
+				listItems.delete(list_item, function(success,err){
+					console.log("delete " + success);
+					console.log("err " + err);
+				});
+			} else {
+				console.log("Updating " + list_item);
+				listItems.save(list_item, function(success,err){
+					console.log("delete " + success);
+					console.log("err " + err);
+				});
+			}
+
+			res.send(201,diff);
+		}
+	});
 }
 
 function getList(req,res,next) {
@@ -110,8 +103,6 @@ function getList(req,res,next) {
 function getListForUser(req,res,next) {
     res.setHeader('Access-Control-Allow-Origin','*');
     
-    console.log("Blah = " + {users:req.params.userid});
-
     lists.find({users:Number(req.params.userid)}, function(err,doc){
 
     	console.log('Lists response success for ' + req.params.userid + ': ' + doc);
@@ -126,19 +117,6 @@ function getListForUser(req,res,next) {
     });
 
     return next();
-}
-
-function addList(userids)
-{
-	//Create a default list for this user
-	var list = {};
-	list.users = userids;
-	list.items = [];
-
-    lists.save(list, function(err,success){
-		console.log('addList Response success ' + success);
-		console.log('addList Response error ' + err);
-	});
 }
 
 function addUser(req,res,next){
@@ -160,13 +138,23 @@ function addUser(req,res,next){
     	} else {
     		//Storing user
     		console.log('Storing user ' + user);
+
     		users.save(user, function(err,success) {
+	   		
 	   			console.log('Response success ' + success);
 	    		console.log('Response error ' + err);
 	    		if (success) {
-	    			addList([req.params.id]);
-	    			res.send(201,user);
-	    			return next();
+	    			//Create a default list for this user
+					var list = {};
+					list.users = [req.params.id];
+					list.items = [];
+
+				    lists.save(list, function(err,success){
+						console.log('addList Response success ' + success);
+						console.log('addList Response error ' + err);
+						res.send(201,user);
+	    				return next();
+					});
 	    		} else {
 					return next(err);
 	    		}

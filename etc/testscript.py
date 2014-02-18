@@ -21,3 +21,6 @@ print r.content
 payload = '{"description":"bananas","number":3}';
 r = requests.put(SERVER_LOC +"list/" + list_id + "/addItem",data=payload,headers=headers);
 print r.content
+
+#4. Change up an item on hte list
+payload = '{"description":"apples","number":-2}';
