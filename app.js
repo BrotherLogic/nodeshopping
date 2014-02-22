@@ -15,15 +15,40 @@ server.use(restify.CORS());
 
 var connection_string = '127.0.0.1:27017/myapp';
 var db = mongojs(connection_string,['myapp']);
+
 var users = db.collection("user");
 var lists = db.collection("list");
 var listItems = db.collection("item");
 var diffs = db.collection("diff");
+var archItems = db.collections("architems");
 
 server.put({path: '/user', version: '0.0.1'}, addUser);
 server.get({path: '/list/:id/:timestamp', version: '0.0.1'}, getList);
 server.get({path: '/list',version : '0.0.1'},getListForUser);
-server.put({path: '/list/:listid/addItem', version: '0.0.1'}, addItemToList)
+server.put({path: '/list/:listid/addItem', version: '0.0.1'}, addItemToList);
+server.post({path: '/item/:id/', version : '0.0.1'}, tickItem);
+
+function tickItem(req,res,next) {
+	 res.setHeader('Access-Control-Allow-Origin','*');
+
+	 tick = {};
+	 tick.description = req.params.description;
+	 tick.number = req.params.number;
+
+	 listItems.findOne({_id:mongojs.ObjectId(req.params.id)}, function (success, doc){
+
+	 	listid = doc.listid;
+	 	applyDiff(listid,tick, function (diff){
+	 		if (diff.number == tick.number) {
+	 	 		//Item has been successfully ticked
+
+	 		} else {
+	 			//Item was not ticked for whatever reason
+	 		}
+
+	 	});
+	 });
+}
 
 function addItemToList(req,res,next) {
 
@@ -136,6 +161,7 @@ function addUser(req,res,next){
     		res.send(200,doc);
     		return next();
     	} else {
+
     		//Storing user
     		console.log('Storing user ' + user);
 
@@ -144,6 +170,7 @@ function addUser(req,res,next){
 	   			console.log('Response success ' + success);
 	    		console.log('Response error ' + err);
 	    		if (success) {
+
 	    			//Create a default list for this user
 					var list = {};
 					list.users = [req.params.id];
