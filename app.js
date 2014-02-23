@@ -1,3 +1,5 @@
+VERSION = '0.0.1';
+
 var http = require('http');
 var restify = require('restify');
 var mongojs = require('mongojs');
@@ -20,13 +22,25 @@ var users = db.collection("user");
 var lists = db.collection("list");
 var listItems = db.collection("item");
 var diffs = db.collection("diff");
-var archItems = db.collections("architems");
+var archItems = db.collection("architem");
 
-server.put({path: '/user', version: '0.0.1'}, addUser);
-server.get({path: '/list/:id/:timestamp', version: '0.0.1'}, getList);
-server.get({path: '/list',version : '0.0.1'},getListForUser);
-server.put({path: '/list/:listid/addItem', version: '0.0.1'}, addItemToList);
-server.post({path: '/item/:id/', version : '0.0.1'}, tickItem);
+//Method to add or retrieve a user - will return a list of the associated lists for this user
+server.put({path: '/user', version: VERSION}, addUser);
+
+//Method to add a list - will return the added list
+server.put({path: '/list', version: VERSION}, addList);
+
+//Gets the items currently on the list
+server.get({path: '/list/:id',version : VERSION},getListItems);
+
+//Gets the diff list for the list, from the provided timestamp
+server.get({path: '/list/:id/:timestamp', version: VERSION}, getList);
+
+//Updates the current list
+server.put({path: '/list/:listid', version: VERSION}, addItemToList);
+
+//Ticks off an item from the list
+server.post({path: '/item/:id/', version : VERSION}, tickItem);
 
 function tickItem(req,res,next) {
 	 res.setHeader('Access-Control-Allow-Origin','*');
@@ -50,6 +64,7 @@ function tickItem(req,res,next) {
 	 });
 }
 
+
 function addItemToList(req,res,next) {
 
 	console.log("adding item to list");
@@ -58,11 +73,49 @@ function addItemToList(req,res,next) {
 	diff.description = req.params.description;
 	diff.number = req.params.number;
 
+	timestamp = req.params.timestamp;
+
 	listid = req.params.listid;
-	givenDiff = updateItem(diff,listid,res);
+	console.log("Running update item");
+	updateItem(diff,listid,timestamp,res);
 }
 
-function updateItem(diff,listid,res) {
+function getDiffs(listid,timestamp,res){
+
+	console.log("Getting diffs " + timestamp)
+
+	if (timestamp != undefined) {
+		console.log("Getting diffs for " + timestamp)
+	
+		diffs.find({listid:listid,timestamp:{$gt:Number(timestamp)}}, function(err,doc){
+		    console.log('Response success ' + doc);
+		    console.log('Response error ' + err);
+		    if (doc) {
+				res.send(200,doc);
+				return next();
+		    } else {
+				return next(err);
+		    }
+		});
+	} else {
+		console.log("Getting all diffs for " + listid)
+	
+		diffs.find({listid:listid}, function(err,doc){
+		    console.log('Response success ' + doc);
+		    console.log('Response error ' + err);
+		    if (doc) {
+				res.send(200,doc);
+				return next();
+		    } else {
+				return next(err);
+		    }
+		});
+	}
+}
+
+function updateItem(diff,listid,timestamp,res) {
+
+	console.log("Updating Item");
 
 	//add the diff to the diff table
 	diff = diff;
@@ -74,6 +127,7 @@ function updateItem(diff,listid,res) {
 	//Adjust the list accordingly
 	listItems.findOne({description: String(diff.description), listid:String(listid)}, function (success,doc){
 		list_item = doc;
+		console.log("Here = " + list_item);
 		if (list_item == null) {
 
 			//Add the item to the list
@@ -83,7 +137,8 @@ function updateItem(diff,listid,res) {
 			newItem.listid = listid;
 
 			listItems.save(newItem);
-			res.send(201,diff);
+			getDiffs(listid,timestamp,res);
+
 		} else {
 			//Update the item
 			list_item.number += diff.number;
@@ -102,7 +157,7 @@ function updateItem(diff,listid,res) {
 				});
 			}
 
-			res.send(201,diff);
+			getDiffs(listid,timestamp,res)
 		}
 	});
 }
@@ -110,7 +165,7 @@ function updateItem(diff,listid,res) {
 function getList(req,res,next) {
     console.log("getList");
 
-    res.setHeader('Access-Control-Allow-Origin','*')
+    res.setHeader('Access-Control-Allow-Origin','*');
 
     diffs.findOne({_id:mongojs.ObjectId(req.params.id),timestamp:{$gt:Number(req.params.timestamp)}}, function(err,doc){
 	    console.log('Response success ' + doc);
@@ -124,6 +179,63 @@ function getList(req,res,next) {
 
 	});
 }  
+
+
+
+function getListItems(req,res,next) {
+    console.log("getList");
+
+    res.setHeader('Access-Control-Allow-Origin','*');
+
+    listItems.find({_id:mongojs.ObjectId(req.params.id),}, function(err,doc){
+	    console.log('Response success ' + doc);
+	    console.log('Response error ' + err);
+	    if (doc) {
+			res.send(200,doc);
+			return next();
+	    } else {
+			return next(err);
+	    }
+
+	});
+}  
+
+function addList(req,res,next) {
+	console.log("addList");
+
+	res.setHeader('Access-Control-Allow-Origin','*');
+
+	userids = req.params.userids;
+
+	//See if this list already exists
+	lists.findOne({users:userids}, function (err,doc) {
+
+		console.log('List response error ' + err);
+		console.log('List response resp ' + doc);
+
+		if (doc == null) {
+			var list = {};
+			list.name = req.params.name;
+			list.users = userids;
+
+			lists.save(list, function (err,success){
+
+				console.log('Intter list response error ' + err);	
+
+				if (success) {
+					res.send(201,list);
+					return next();
+				} else {
+					return next(err);
+				}
+			});
+		} else {
+			res.send(200,doc);
+			return next();
+		}
+
+	});
+}
 
 function getListForUser(req,res,next) {
     res.setHeader('Access-Control-Allow-Origin','*');
@@ -156,17 +268,18 @@ function addUser(req,res,next){
     	console.log('Response error ' + err);
     	console.log('Doc ret ' + doc);
 
-    	//If the user is new - ensure that at least one list is created
+    	//return the lists for this user if they already exist
     	if (doc != null) {
-    		res.send(200,doc);
-    		return next();
+    		lists.find({users:user.id}, function(err,doc){
+    			res.send(200,doc);
+    			return next();
+    		});
     	} else {
 
     		//Storing user
     		console.log('Storing user ' + user);
 
-    		users.save(user, function(err,success) {
-	   		
+    		users.save(user, function(err,success) {	   		
 	   			console.log('Response success ' + success);
 	    		console.log('Response error ' + err);
 	    		if (success) {
@@ -175,11 +288,12 @@ function addUser(req,res,next){
 					var list = {};
 					list.users = [req.params.id];
 					list.items = [];
+					list.name = "Default";
 
 				    lists.save(list, function(err,success){
 						console.log('addList Response success ' + success);
 						console.log('addList Response error ' + err);
-						res.send(201,user);
+						res.send(200,[list]);
 	    				return next();
 					});
 	    		} else {
