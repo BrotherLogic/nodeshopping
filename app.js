@@ -167,7 +167,7 @@ function getList(req,res,next) {
 
     res.setHeader('Access-Control-Allow-Origin','*');
 
-    diffs.findOne({_id:mongojs.ObjectId(req.params.id),timestamp:{$gt:Number(req.params.timestamp)}}, function(err,doc){
+    diffs.find({listid:req.params.id,timestamp:{$gt:Number(req.params.timestamp)}}, function(err,doc){
 	    console.log('Response success ' + doc);
 	    console.log('Response error ' + err);
 	    if (doc) {
@@ -183,11 +183,11 @@ function getList(req,res,next) {
 
 
 function getListItems(req,res,next) {
-    console.log("getList");
+    console.log("getList " + req.params.id);
 
     res.setHeader('Access-Control-Allow-Origin','*');
 
-    listItems.find({_id:mongojs.ObjectId(req.params.id),}, function(err,doc){
+    listItems.find({listid:req.params.id}, function(err,doc){
 	    console.log('Response success ' + doc);
 	    console.log('Response error ' + err);
 	    if (doc) {

@@ -56,5 +56,10 @@ print r.content
 r = requests.get(SERVER_LOC + "list/" + listid,headers=headers)
 print r.content
 
+payload = '{"description":"bananas","number":1}'
+print payload
+r = requests.put(SERVER_LOC + "list/" + listid + "?timestamp=" + `timestamp`,data=payload,headers=headers)
+print r.content
+
 r = requests.get(SERVER_LOC + "list/" + listid + "/" + `timestamp`,headers=headers)
 print r.content
